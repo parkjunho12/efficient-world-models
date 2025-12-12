@@ -1,0 +1,122 @@
+# -------------------------
+# Python 기본
+# -------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상환경
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# 빌드 & 배포 아티팩트
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 로그 & temp 파일
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# -------------------------
+# RAG 관련 아티팩트
+# -------------------------
+
+# 문서 인덱스 (FAISS)
+data/embeddings/
+*.index
+*.faiss
+
+# 문서 메타데이터
+*.pkl
+*.pickle
+data/documents/*
+!data/documents/.gitkeep
+
+# 캐시
+cache/
+*.cache
+*.db
+
+# OpenAI 응답 캐시 등
+.openai_cache/
+rag_cache/
+
+# 평가 결과 (원하면 제외)
+evaluation/results/
+evaluation/logs/
+
+# -------------------------
+# 모델 관련
+# -------------------------
+
+# 로컬 임베딩 모델 다운로드
+models/
+model/
+sentence-transformers/
+*.pt
+*.bin
+*.onnx
+
+# HuggingFace 캐시
+~/.cache/huggingface/
+huggingface/
+hf_cache/
+
+# -------------------------
+# FastAPI / 웹 서버
+# -------------------------
+
+# uvicorn reload artifacts
+*.pid
+
+# -------------------------
+# 인증/비밀 정보
+# -------------------------
+.env
+*.env
+**/.env
+secrets/
+config/secret.yaml
+api_keys.json
+
+# -------------------------
+# 운영 파일
+# -------------------------
+*.sqlite3
+*.db
+*.sql
+
+# -------------------------
+# OS / 에디터 파일
+# -------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# -------------------------
+# Docker
+# -------------------------
+docker-compose.override.yml
+*.tar
+*.img
+
+# -------------------------
+# Tests
+# -------------------------
+.coverage
+htmlcov/
+.tox/
+pytest_cache/
+
