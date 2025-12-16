@@ -66,3 +66,4 @@ pytest>=7.4.0
 # Python >= 3.8
 # CUDA >= 11.7 (for GPU support)
 # cuDNN >= 8.0
+requests
