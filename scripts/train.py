@@ -50,15 +50,17 @@ def main():
     )
     
     train_dataset = NuScenesDataset(
-        data_root=args.data_root + '/train',
+        data_root=args.data_root,
         sequence_length=config['data']['sequence_length'],
-        transform=transform
+        transform=transform,
+        split='train'
     )
     
     val_dataset = NuScenesDataset(
-        data_root=args.data_root + '/val',
+        data_root=args.data_root,
         sequence_length=config['data']['sequence_length'],
-        transform=transform
+        transform=transform,
+        split='val'
     )
     
     train_loader = DataLoader(
