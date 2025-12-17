@@ -97,7 +97,21 @@ class Trainer:
                     predicted_latents=outputs.get('predicted_latents')
                 )
                 
-                loss = loss_dict['total'] / self.grad_accum_steps
+                # loss = loss_dict['total'] / self.grad_accum_steps
+                
+                if isinstance(loss_out, dict):
+                    loss_dict = loss_out
+                    total_loss = loss_dict["total"]
+                else:
+                    # loss_fn이 scalar tensor를 반환하는 경우
+                    total_loss = loss_out
+                    loss_dict = {
+                        "total": total_loss,
+                        "reconstruction": torch.tensor(0.0, device=total_loss.device),
+                        "prediction": torch.tensor(0.0, device=total_loss.device),
+                    }
+                    
+                loss = total_loss / self.grad_accum_steps
             
             # Backward pass
             if self.use_amp:
