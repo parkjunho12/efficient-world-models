@@ -136,7 +136,7 @@ jobs:
       - name: Build & Push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ env.DOCKER_CONTEXT }}
+          context: .
           file: ./Dockerfile
           platforms: linux/amd64
           push: true
