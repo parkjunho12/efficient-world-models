@@ -42,14 +42,14 @@ class Trainer:
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self.loss_fn = loss_fn
+        self.loss_fn = loss_fn.to(device)
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.device = device
         self.config = config or {}
         
         # Training settings
-        self.use_amp = self.config.get('use_amp', True)
+        self.use_amp = self.config.get('use_amp', False)
         self.scaler = GradScaler() if self.use_amp else None
         self.grad_accum_steps = self.config.get('grad_accum_steps', 1)
         self.grad_clip = self.config.get('grad_clip', 1.0)
@@ -89,7 +89,7 @@ class Trainer:
                 outputs = self.model(images, actions, return_latents=True)
                 
                 # Compute loss
-                loss_dict = self.loss_fn(
+                loss_out = self.loss_fn(
                     reconstructed=outputs['reconstructed'],
                     predicted=outputs['predicted'],
                     images=images,
@@ -181,13 +181,24 @@ class Trainer:
             with autocast(enabled=self.use_amp):
                 outputs = self.model(images, actions, return_latents=True)
                 
-                loss_dict = self.loss_fn(
+                loss_out = self.loss_fn(
                     reconstructed=outputs['reconstructed'],
                     predicted=outputs['predicted'],
                     images=images,
                     latents=outputs.get('latents'),
                     predicted_latents=outputs.get('predicted_latents')
                 )
+                if isinstance(loss_out, dict):
+                    loss_dict = loss_out
+                    total_loss = loss_dict["total"]
+                else:
+                    # loss_fn이 scalar tensor를 반환하는 경우
+                    total_loss = loss_out
+                    loss_dict = {
+                        "total": total_loss,
+                        "reconstruction": torch.tensor(0.0, device=total_loss.device),
+                        "prediction": torch.tensor(0.0, device=total_loss.device),
+                    }
             
             for k, v in loss_dict.items():
                 if k in val_losses:

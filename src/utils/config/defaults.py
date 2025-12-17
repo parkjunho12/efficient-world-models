@@ -11,7 +11,7 @@ DEFAULT_CONFIG = {
         'batch_size': 16,
         'num_epochs': 100,
         'learning_rate': 1e-4,
-        'use_amp': True
+        'use_amp': False
     },
     'data': {
         'sequence_length': 10,
