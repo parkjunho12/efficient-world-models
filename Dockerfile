@@ -9,7 +9,7 @@
 # ============================================================================
 # Stage 1: Base Image with CUDA
 # ============================================================================
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04 AS base
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS base
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -51,8 +51,10 @@ WORKDIR /tmp
 COPY requirements.txt /tmp/requirements.txt
 
 # Install Python dependencies
-RUN pip3 install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118 && \
-    pip3 install -r /tmp/requirements.txt
+RUN pip3 install --no-cache-dir torch==2.1.0 torchvision==0.16.0 \
+      --index-url https://download.pytorch.org/whl/cu118 \
+ && pip3 install --no-cache-dir -r /tmp/requirements.txt
+
 
 # Install additional ML tools
 RUN pip3 install \
