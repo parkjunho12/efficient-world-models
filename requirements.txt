@@ -68,4 +68,3 @@ pytest>=7.4.0
 # cuDNN >= 8.0
 
 requests
-nuscenes-devkit
