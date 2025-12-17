@@ -101,8 +101,8 @@ FROM application AS production
 CMD ["/bin/bash"]
 
 # Expose ports
-EXPOSE 6006  # TensorBoard
-EXPOSE 8888  # Jupyter
+EXPOSE 6006 
+EXPOSE 8888  
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
