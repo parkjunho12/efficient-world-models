@@ -44,14 +44,15 @@ RUN pip3 install --upgrade pip setuptools wheel
 # ============================================================================
 FROM base AS dependencies
 
+ENV PYTHONUNBUFFERED=1
 WORKDIR /tmp
 
 # Copy requirements
-COPY requirements.txt .
+COPY requirements.txt /tmp/requirements.txt
 
 # Install Python dependencies
 RUN pip3 install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118 && \
-    pip3 install -r requirements.txt
+    pip3 install -r /tmp/requirements.txt
 
 # Install additional ML tools
 RUN pip3 install \
