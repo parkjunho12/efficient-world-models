@@ -1,0 +1,150 @@
+name: CI & Release
+
+on:
+  pull_request:
+    branches: [develop, main]        # PR에서는 CI만
+  push:
+    branches: [develop, main]                 # main에 머지되면 릴리스
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}   # ghcr.io/<owner>/<repo>
+  BUILD_CONTEXT: .               # Dockerfile 위치
+  PY: '3.10'
+
+jobs:
+  # --- CI: PR 단계에서 lint/test + (선택)빌드검증 ---
+  ci:
+    name: Lint & Tests (PR)
+    if: startsWith(github.event_name, 'pull_request')
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/ghdlwnsgh12/edge-snn-robot-template:latest
+      options: --user 0:0 
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show env
+        run: |
+          python3 -V
+
+      - name: Ensure test tools
+        run: |
+          python3 -m pip install --upgrade pip || true
+
+
+  # --- Release: main push 시 버전업 + 빌드/푸시 ---
+  release:
+    name: Version bump & Build/Push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # 태그/커밋 푸시하려면 write 필요
+      packages: write      # GHCR 푸시
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 태그/기록 확인 위해 전체 가져오기
+
+      - name: Set Git identity
+        run: |
+          git config user.name  "parkjunho12"
+          git config user.email "ghdlwnsgh25@gmail.com"
+
+      - name: Resolve current version
+        id: ver
+        run: |
+          # 1) VERSION 파일이 있으면 거기서, 없으면 최신 태그에서 유추
+          if [ -f VERSION ]; then
+            CURRENT=$(cat VERSION | tr -d ' \n')
+          else
+            LAST_TAG=$(git tag --list 'v*' | sort -V | tail -n1 || true)
+            CURRENT=${LAST_TAG#v}
+            if [ -z "$CURRENT" ]; then CURRENT="0.0.0"; fi
+          fi
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+
+          # 2) bump 레벨 결정: 기본 patch, 커밋 메시지에 #major/#minor/#patch
+          MSG="$(git log -1 --pretty=%B)"
+          BUMP="patch"
+          echo "$MSG" | grep -qi '#major' && BUMP="major"
+          echo "$MSG" | grep -qi '#minor' && BUMP="minor"
+          echo "$MSG" | grep -qi '#patch' && BUMP="patch"
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+
+          # 3) 다음 버전 계산
+          IFS='.' read -r MA MI PA <<< "$CURRENT"
+          case "$BUMP" in
+            major) MA=$((MA+1)); MI=0; PA=0 ;;
+            minor) MI=$((MI+1)); PA=0 ;;
+            patch) PA=$((PA+1)) ;;
+          esac
+          NEXT="${MA}.${MI}.${PA}"
+          echo "$NEXT" > VERSION
+          echo "next=$NEXT" >> $GITHUB_OUTPUT
+          echo "Next version: $NEXT (bump: $BUMP)"
+
+      - name: Commit VERSION bump
+        run: |
+          git add VERSION
+          git commit -m "chore(release): bump version to $(cat VERSION)"
+          git push origin HEAD:main
+
+      - name: Create and push tag
+        run: |
+          V="v$(cat VERSION)"
+          git tag -a "$V" -m "Release $V"
+          git push origin "$V"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub도 푸시하려면 주석 해제 + 시크릿 추가
+      # - name: Login DockerHub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # - name: Docker metadata
+      #   id: meta
+      #   uses: docker/metadata-action@v5
+      #   with:
+      #     images: |
+      #       ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      #       docker.io/ghdlwnsgh12/edge-snn-robot-template 
+      #     tags: |
+      #       type=raw,value=v${{ steps.ver.outputs.next }}   # 새 버전 태그
+      #       type=raw,value=latest,enable=true               # latest 항상 부여
+
+      - name: Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.BUILD_CONTEXT }}
+          # file: ./Dockerfile  
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to:   type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          provenance: false 
+
+
