@@ -51,9 +51,10 @@ WORKDIR /tmp
 COPY requirements.txt /tmp/requirements.txt
 
 # Install Python dependencies
-RUN pip3 install --no-cache-dir torch==2.1.0 torchvision==0.16.0 \
+RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
+ && python3 -m pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 \
       --index-url https://download.pytorch.org/whl/cu118 \
- && pip3 install --no-cache-dir -r /tmp/requirements.txt
+ && python3 -m pip install --no-cache-dir --use-deprecated=legacy-resolver -r /tmp/requirements.txt
 
 
 # Install additional ML tools
@@ -112,7 +113,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python3 -c "import torch; print(torch.cuda.is_available())" || exit 1
 
 # Add labels
-LABEL maintainer="your-email@example.com" \
+LABEL maintainer="ghdlwnsgh25@gmail.com" \
       version="1.0" \
       description="World Model for Autonomous Driving"
 
