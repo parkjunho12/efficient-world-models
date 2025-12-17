@@ -120,3 +120,4 @@ htmlcov/
 .tox/
 pytest_cache/
 
+data/*
