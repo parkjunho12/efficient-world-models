@@ -2,9 +2,9 @@ name: CI & Release
 
 on:
   pull_request:
-    branches: [develop, main]        # PR에서는 CI만
+    branches: [develop, master]        # PR에서는 CI만
   push:
-    branches: [develop, main]                 # main에 머지되면 릴리스
+    branches: [develop, master]                 # main에 머지되면 릴리스
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -42,7 +42,7 @@ jobs:
   # --- Release: main push 시 버전업 + 빌드/푸시 ---
   release:
     name: Version bump & Build/Push
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write      # 태그/커밋 푸시하려면 write 필요
@@ -95,7 +95,7 @@ jobs:
         run: |
           git add VERSION
           git commit -m "chore(release): bump version to $(cat VERSION)"
-          git push origin HEAD:main
+          git push origin HEAD:master
 
       - name: Create and push tag
         run: |
