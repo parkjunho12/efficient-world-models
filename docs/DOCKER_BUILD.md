@@ -398,7 +398,7 @@ docker run --shm-size=16g world-model:latest
 shm_size: '16gb'
 ```
 
-### 문제 3: Permission Errors
+### Issue 3: Permission Errors
 
 **Solution:**
 ```bash
