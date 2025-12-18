@@ -1,298 +1,477 @@
-# 🚀 Quick Docker Build Guide
+# 🐳 Docker Deployment Guide
 
-## 문제 해결: requirements.txt not found
+## 📋 Project Structure
 
-### 원인
-Docker 빌드 시 `requirements.txt` 파일을 찾을 수 없는 경우는 보통 다음과 같은 이유 때문입니다:
-1. `.dockerignore`에 의해 제외됨
-2. 빌드 컨텍스트가 잘못 설정됨
-3. 파일 경로 문제
-
-### 해결 방법
-
-#### 방법 1: 개선된 Dockerfile 사용 (권장)
-
-새로운 Dockerfile은 `requirements.txt` 없이도 작동합니다:
-
-```bash
-# 빌드
-docker build -t world-model:latest .
-
-# 실행
-docker run --gpus all -it world-model:latest
 ```
+.
+├── Dockerfile              # Multi-stage Docker image definition
+├── docker-compose.yml      # Service orchestration
+├── .dockerignore           # Docker build exclusions
+├── requirements.txt        # Python dependencies
+└── docs/DOCKER_GUIDE.md    # This document
 
-#### 방법 2: .dockerignore 확인
-
-`.dockerignore` 파일에서 `requirements.txt`가 제외되지 않았는지 확인:
-
-```bash
-# .dockerignore 확인
-cat .dockerignore | grep requirements.txt
-
-# 있으면 제거
-```
-
-#### 방법 3: 빌드 컨텍스트 확인
-
-올바른 디렉토리에서 빌드하는지 확인:
-
-```bash
-# 프로젝트 루트에서 실행
-cd /path/to/world-model
-ls -la  # setup.py, Dockerfile, src/ 등이 보여야 함
-docker build -t world-model:latest .
 ```
 
 ---
 
-## 빠른 빌드 명령어
+## 🚀 Quick Start
 
-### 1. Production 이미지 빌드
+### 1.Build Docker Images
 
 ```bash
-# 기본 빌드
+# Production image
 docker build -t world-model:latest .
 
-# 캐시 없이 빌드 (clean build)
-docker build --no-cache -t world-model:latest .
-
-# BuildKit 사용 (빠른 빌드)
-DOCKER_BUILDKIT=1 docker build -t world-model:latest .
-```
-
-### 2. Development 이미지 빌드
-
-```bash
+# Development image
 docker build --target development -t world-model:dev .
+
 ```
 
-### 3. 특정 GPU 아키텍처용 빌드
+### 2. Run the Full Stack with Docker Compose
 
 ```bash
-# CUDA 11.8 (기본)
-docker build -t world-model:latest .
+# Start all services
+docker-compose up -d
 
-# CUDA 12.1
-docker build \
-  --build-arg BASE_IMAGE=nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 \
-  -t world-model:cuda12 .
+# Start specific services only
+docker-compose up -d world-model-train tensorboard
+
+# View logs
+docker-compose logs -f world-model-train
+
+# Stop all services
+docker-compose down
+
 ```
 
 ---
 
-## Docker 없이 설치 (로컬 개발)
+## 🎯 Individual Service Usage
 
-Docker를 사용하지 않는 경우:
+### 1. Training
 
 ```bash
-# 1. Python 가상환경 생성
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate  # Windows
+# Using Docker Compose
+docker-compose up world-model-train
 
-# 2. PyTorch 설치
-pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu118
+# Run directly
+docker run --gpus all \
+  -v $(pwd)/data:/workspace/data \
+  -v $(pwd)/checkpoints:/workspace/checkpoints \
+  -v $(pwd)/runs:/workspace/runs \
+  world-model:latest \
+  python scripts/train.py --config configs/training/base.yaml
 
-# 3. 나머지 패키지 설치
-pip install numpy pillow opencv-python pandas scikit-learn \
-    scipy matplotlib seaborn imageio pyyaml tensorboard \
-    wandb tqdm h5py jupyter ipython
+```
 
-# 4. 프로젝트 설치
-pip install -e .
+### 2. TensorBoard
+
+```bash
+# Using Docker Compose
+docker-compose up -d tensorboard
+
+# Access in browser
+# http://localhost:6006
+
+# Run directly
+docker run -d \
+  -p 6006:6006 \
+  -v $(pwd)/runs:/workspace/runs \
+  world-model:latest \
+  tensorboard --logdir=/workspace/runs --host=0.0.0.0
+
+```
+
+### 3. Jupyter Notebook
+
+```bash
+# Using Docker Compose
+docker-compose up -d jupyter
+
+# Check token
+docker-compose logs jupyter
+
+# Access in browser
+# http://localhost:8888
+
+# Run directly
+docker run -d \
+  --gpus all \
+  -p 8888:8888 \
+  -v $(pwd):/workspace \
+  world-model:latest \
+  jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+
+```
+
+### 4. Evaluation
+
+```bash
+# Using Docker Compose
+docker-compose up world-model-eval
+
+# Run directly
+docker run --gpus all \
+  -v $(pwd)/data:/workspace/data \
+  -v $(pwd)/checkpoints:/workspace/checkpoints \
+  -v $(pwd)/outputs:/workspace/outputs \
+  world-model:latest \
+  python scripts/evaluate.py --checkpoint checkpoints/checkpoint_best.pt
+
+```
+
+### 5. Development Shell
+
+```bash
+# Using Docker Compose
+docker-compose run --rm world-model-dev
+
+# Run directly
+docker run -it --gpus all \
+  -v $(pwd):/workspace \
+  world-model:dev \
+  /bin/bash
+
 ```
 
 ---
 
-## 빌드 검증
+## 📊 Dockerfile Architecture
 
-### 1. GPU 확인
+### 멀티스테이지 빌드
+
+```dockerfile
+Stage 1: base           # CUDA + system dependencies
+  ↓
+Stage 2: dependencies   # Python packages
+  ↓
+Stage 3: application    # Application source code
+  ↓
+Stage 4: production     # Final production image (optimized)
+  ↓
+Stage 5: development    # Dev tools included (optional)
+
+```
+
+**Advantages:**
+- Minimal final image size
+- Optimized build cache usage
+- Clear separation between development and production
+
+### Included Core Packages
+
+**Deep Learning:**
+- PyTorch 2.1.0 (CUDA 11.8)
+- TorchVision 0.16.0
+
+**Visualization:**
+- TensorBoard
+- Weights & Biases
+- Matplotlib, Seaborn
+
+**Data Processing:**
+- NumPy, Pandas, SciPy
+- OpenCV, PIL
+
+**Development (development image only):**
+- Pytest, Black, Flake8
+- Jupyter, IPython
+
+---
+
+## 🔧 Environment Variables
+
+### Required Variables
+
+```bash
+# GPU configuration
+NVIDIA_VISIBLE_DEVICES=all
+CUDA_VISIBLE_DEVICES=0,1
+
+# W&B API key (optional)
+WANDB_API_KEY=your_api_key_here
+
+# Environment mode
+ENVIRONMENT=production  # or development
+
+```
+
+### Configuration Methods
+
+**1. In docker-compose.yml**
+```yaml
+environment:
+  - WANDB_API_KEY=${WANDB_API_KEY}
+  - CUDA_VISIBLE_DEVICES=0
+```
+
+**2. Using a .env file**
+```bash
+# .env
+WANDB_API_KEY=your_key_here
+CUDA_VISIBLE_DEVICES=0,1
+```
+
+**3. At runtime**
+```bash
+docker run -e WANDB_API_KEY=your_key world-model:latest
+```
+
+---
+
+## 📂 Volume Mounts
+
+### Recommended Mount Points
+
+```yaml
+volumes:
+  - ./data:/workspace/data                    # Datasets
+  - ./checkpoints:/workspace/checkpoints      # Model checkpoints
+  - ./runs:/workspace/runs                    # TensorBoard logs
+  - ./outputs:/workspace/outputs              # Result files
+  - ./logs:/workspace/logs                    # Application logs
+
+```
+
+### Notes
+
+**❌ Do NOT mount:**
+- `__pycache__/` (auto)
+- Python virtual environments (`venv/`, `env/`)
+- Build artifacts
+
+**✅ Recommended to mount:**
+- Training data
+- Configuration files
+- Checkpoints
+- Logs and outputs
+
+---
+
+## 🎛️ GPU Configuration
+
+### Enable GPU
+
+**Docker:**
+```bash
+docker run --gpus all world-model:latest
+```
+
+**Docker Compose:**
+```yaml
+runtime: nvidia
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1  # 사용할 GPU 수
+          capabilities: [gpu]
+```
+
+### Select Specific GPUs
+
+```bash
+docker run --gpus '"device=0,1"' world-model:latest
+
+# Or via environment variable
+docker run -e CUDA_VISIBLE_DEVICES=0,1 world-model:latest
+```
+
+### GPU 메모리 제한
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 16G
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities: [gpu]
+```
+
+---
+
+## 🧪 Testing & Debugging
+
+### 1. Check GPU Availability
 
 ```bash
 docker run --gpus all world-model:latest \
-  python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, Devices: {torch.cuda.device_count()}')"
+  python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
 ```
 
-**예상 출력:**
-```
-CUDA: True, Devices: 1
-```
-
-### 2. 패키지 확인
+### 2. Access Container Shell
 
 ```bash
-docker run world-model:latest python3 -c "
-import torch
-import torchvision
-import numpy as np
-import cv2
-print('✓ All packages imported successfully')
-print(f'PyTorch: {torch.__version__}')
-print(f'TorchVision: {torchvision.__version__}')
-"
+# Running container
+docker exec -it world-model-train /bin/bash
+
+# New container
+docker run -it --rm world-model:latest /bin/bash
+
 ```
 
-### 3. 프로젝트 모듈 확인
+### 3. View Logs
 
 ```bash
-docker run world-model:latest python3 -c "
-from models.world_model import build_world_model
-from training.losses import WorldModelLoss
-from data.datasets.nuscenes import NuScenesDataset
-print('✓ All project modules imported successfully')
-"
+# Real-time logs
+docker-compose logs -f world-model-train
+
+# Recent 100 lines
+docker-compose logs --tail=100 world-model-train
+```
+
+### 4.Debug Mode
+
+```bash
+docker run -it --gpus all \
+  -v $(pwd):/workspace \
+  world-model:dev \
+  python -m ipdb scripts/train.py
 ```
 
 ---
 
-## 일반적인 빌드 오류 해결
+## 🚀 Production Deployment
 
-### 오류 1: "CUDA not available"
+### 1. Optimized Image Build
 
-**해결:**
 ```bash
-# NVIDIA Docker 런타임 설치
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+docker build \
+  --build-arg CUDA_VERSION=11.8.0 \
+  --build-arg PYTHON_VERSION=3.10 \
+  -t world-model:prod .
 
-sudo apt-get update && sudo apt-get install -y nvidia-docker2
-sudo systemctl restart docker
+```
 
-# 테스트
+### 2. Multi-GPU Training
+
+```bash
+docker run --gpus all \
+  --shm-size=16g \
+  -v $(pwd)/data:/workspace/data \
+  world-model:latest \
+  torchrun --nproc_per_node=4 scripts/train.py \
+    --config configs/training/distributed.yaml
+```
+
+### 3. Resource Limits
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '8'
+      memory: 32G
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 2
+          capabilities: [gpu]
+```
+
+---
+
+## 🔍 Troubleshooting
+### Issue 1: GPU Not Detected
+
+**Solution:**
+```bash
+# NVIDIA Docker runtime check
 docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
+
+# Restart Docker
+sudo systemctl restart docker
 ```
 
-### 오류 2: "No space left on device"
+### Issue 2: Out of Memory
 
-**해결:**
+**Solution:**
 ```bash
-# Docker 정리
-docker system prune -a --volumes
+# Increase Shared memory
+docker run --shm-size=16g world-model:latest
 
-# 사용하지 않는 이미지 삭제
-docker image prune -a
-
-# 빌드 캐시 정리
-docker builder prune
+# or docker-compose.yml
+shm_size: '16gb'
 ```
 
-### 오류 3: "Cannot connect to Docker daemon"
+### 문제 3: Permission Errors
 
-**해결:**
+**Solution:**
 ```bash
-# Docker 서비스 시작
-sudo systemctl start docker
+# Current user ID
+docker run --user $(id -u):$(id -g) world-model:latest
 
-# Docker 상태 확인
-sudo systemctl status docker
-
-# 사용자를 docker 그룹에 추가
-sudo usermod -aG docker $USER
-newgrp docker
+# or modify volumes permission
+sudo chown -R $(whoami):$(whoami) ./data ./checkpoints
 ```
 
-### 오류 4: 빌드가 매우 느림
+### Issue 4: Slow Build
 
-**해결:**
+**Solution:**
 ```bash
-# BuildKit 활성화 (병렬 빌드)
-export DOCKER_BUILDKIT=1
-docker build -t world-model:latest .
+# Activate BuildKit (Parellel build)
+DOCKER_BUILDKIT=1 docker build -t world-model:latest .
 
-# 또는 docker-compose에서
-COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker-compose build
+# Using build cache
+docker build --cache-from world-model:latest -t world-model:latest .
 ```
 
 ---
 
-## 최소 요구사항
+## 📈 Performance Optimisation
 
-### 하드웨어
-- **CPU**: 4+ cores
-- **RAM**: 16GB+ (권장: 32GB)
-- **GPU**: NVIDIA GPU with 8GB+ VRAM
-- **Storage**: 50GB+ free space
-
-### 소프트웨어
-- **Docker**: 20.10+
-- **NVIDIA Driver**: 525+ (CUDA 11.8 지원)
-- **docker-compose**: 1.29+ (선택)
-
----
-
-## 이미지 크기 최적화
-
-### 현재 이미지 크기 확인
-
-```bash
-docker images world-model
-```
-
-### 최적화 팁
-
-1. **멀티스테이지 빌드 사용** (이미 적용됨)
-2. **불필요한 파일 제외** (.dockerignore 활용)
-3. **레이어 최소화**:
+### 1. Build Optimisation
 
 ```dockerfile
-# ❌ 나쁜 예 (3 layers)
-RUN apt-get update
-RUN apt-get install -y python3
-RUN apt-get clean
-
-# ✅ 좋은 예 (1 layer)
-RUN apt-get update && \
-    apt-get install -y python3 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Optimise Layer Caching
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .  # 코드는 마지막에
 ```
 
----
-
-## 빠른 테스트
-
-빌드 후 프로젝트가 제대로 작동하는지 빠르게 테스트:
+### 2. Runtime Optimisation
 
 ```bash
-# 1. 컨테이너 시작
-docker run -it --gpus all \
-  -v $(pwd)/data:/workspace/data \
-  world-model:latest bash
+# Fix CPU (NUMA Optimisation)
+docker run --cpuset-cpus="0-7" world-model:latest
 
-# 2. 컨테이너 내부에서
-python -c "
-from models.world_model import build_world_model
-import torch
+# I/O Priority
+docker run --blkio-weight=500 world-model:latest
+```
 
-model = build_world_model({
-    'latent_dim': 256,
-    'action_dim': 4,
-    'hidden_dim': 512
-})
+### 3. Network Optimisation
 
-# 테스트 입력
-images = torch.randn(2, 10, 3, 256, 256)
-actions = torch.randn(2, 9, 4)
-
-# Forward pass
-output = model(images, actions)
-print('✓ Model works!')
-print(f'Output shape: {output[\"reconstructed\"].shape}')
-"
+```yaml
+# Using Host network (distributed train)
+network_mode: host
 ```
 
 ---
 
-## 추가 자료
+## 📊 Monitoring
 
-- [Docker 공식 문서](https://docs.docker.com/)
-- [NVIDIA Docker 문서](https://github.com/NVIDIA/nvidia-docker)
-- [PyTorch Docker 이미지](https://hub.docker.com/r/pytorch/pytorch)
-- [CUDA 호환성](https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/)
+### Resource Usage
+
+```bash
+# Real-time statistics
+docker stats world-model-train
+
+# All containers
+docker-compose stats
+```
+
+### GPU Monitoring
+
+```bash
+# In contatiner
+docker exec world-model-train nvidia-smi
+
+# Periodical checking
+docker exec world-model-train watch -n 1 nvidia-smi
+```
 
 ---
-
-**문제가 계속되면 이슈를 남겨주세요!** 🐛

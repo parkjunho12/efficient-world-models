@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # Main training service
+  world-model-train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: world-model:latest
+    container_name: world-model-train
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - ENVIRONMENT=production
+    volumes:
+      - ./data:/workspace/data
+      - ./checkpoints:/workspace/checkpoints
+      - ./runs:/workspace/runs
+      - ./outputs:/workspace/outputs
+      - ./logs:/workspace/logs
+    working_dir: /workspace
+    command: python scripts/train.py --config configs/training/base.yaml
+    shm_size: '16gb'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - world-model-network
+
+  # TensorBoard visualization service
+  tensorboard:
+    image: world-model:latest
+    container_name: world-model-tensorboard
+    command: tensorboard --logdir=/workspace/runs --host=0.0.0.0 --port=6006
+    ports:
+      - "6006:6006"
+    volumes:
+      - ./runs:/workspace/runs
+    networks:
+      - world-model-network
+
+  # Jupyter notebook for experimentation
+  jupyter:
+    image: world-model:latest
+    container_name: world-model-jupyter
+    command: jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./:/workspace
+      - ./data:/workspace/data
+      - ./checkpoints:/workspace/checkpoints
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    runtime: nvidia
+    networks:
+      - world-model-network
+
+  # Evaluation service
+  world-model-eval:
+    image: world-model:latest
+    container_name: world-model-eval
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./data:/workspace/data
+      - ./checkpoints:/workspace/checkpoints
+      - ./outputs:/workspace/outputs
+    command: python scripts/evaluate.py --checkpoint checkpoints/checkpoint_best.pt
+    networks:
+      - world-model-network
+
+  # Development environment
+  world-model-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: world-model:dev
+    container_name: world-model-dev
+    runtime: nvidia
+    stdin_open: true
+    tty: true
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - ENVIRONMENT=development
+    volumes:
+      - ./:/workspace
+      - ./data:/workspace/data
+      - ./checkpoints:/workspace/checkpoints
+    working_dir: /workspace
+    command: /bin/bash
+    networks:
+      - world-model-network
+
+networks:
+  world-model-network:
+    driver: bridge
+
+volumes:
+  data:
+  checkpoints:
+  runs:
+  outputs:

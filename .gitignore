@@ -121,3 +121,6 @@ htmlcov/
 pytest_cache/
 
 data/*
+
+results/evaluation/metrics
+results/evaluation/samples
