@@ -34,6 +34,8 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    pkg-config \
+    libhdf5-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
@@ -52,9 +54,10 @@ COPY requirements.txt /tmp/requirements.txt
 
 # Install Python dependencies
 RUN python3 -m pip install --no-cache-dir -U pip setuptools wheel \
- && python3 -m pip install --no-cache-dir torch==2.1.0 torchvision==0.16.0 \
-      --index-url https://download.pytorch.org/whl/cu118 \
- && python3 -m pip install --no-cache-dir --use-deprecated=legacy-resolver -r /tmp/requirements.txt
+ && python3 -m pip install --no-cache-dir \
+      torch==2.1.0 torchvision==0.16.0 \
+      --extra-index-url https://download.pytorch.org/whl/cu121 \
+ && python3 -m pip install --no-cache-dir -r /tmp/requirements.txt
 
 
 # Install additional ML tools

@@ -8,7 +8,7 @@
 
 ## ⚡ Quick Start
 
-\`\`\`bash
+```bash
 # Install dependencies
 pip install -r requirements.txt
 
@@ -20,7 +20,7 @@ python scripts/train.py --config configs/training/base.yaml
 
 # Run inference
 python scripts/inference.py --checkpoint checkpoints/best.pt --input video.mp4
-\`\`\`
+```
 
 ## 📊 Key Metrics
 
@@ -33,7 +33,7 @@ python scripts/inference.py --checkpoint checkpoints/best.pt --input video.mp4
 
 ## 📂 Project Structure
 
-\`\`\`
+```
 world-model-autonomous/
 ├── src/                  # Source code
 │   ├── models/          # Model architectures
@@ -46,7 +46,7 @@ world-model-autonomous/
 ├── tests/               # Unit & integration tests
 ├── notebooks/           # Jupyter notebooks
 └── docs/                # Documentation
-\`\`\`
+```
 
 ## 📚 Documentation
 
@@ -54,6 +54,7 @@ world-model-autonomous/
 - [Dataset Guide](docs/DATASETS.md) - **Start here for data setup!**
 - [Architecture](docs/ARCHITECTURE.md)
 - [Training Guide](docs/TRAINING.md)
+- [Docker Build Guide](docs/DOCKER_BUILD.md)
 
 ## 🗃️ Supported Datasets
 
@@ -74,7 +75,7 @@ world-model-autonomous/
 - Real Waymo sensors
 - [Setup Guide](docs/DATASETS.md#3-waymo-open-dataset)
 
-## 💡 For Amazon/Wayve Interviews
+## 💡 Lesson Learned
 
 **This project demonstrates:**
 - ✅ Production-ready ML systems

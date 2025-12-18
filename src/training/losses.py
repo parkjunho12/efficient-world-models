@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, Optional
+from torch.cuda.amp import autocast
 
 
 class PerceptualLoss(nn.Module):
@@ -40,6 +41,17 @@ class PerceptualLoss(nn.Module):
             param.requires_grad = False
         
         self.eval()
+        
+        # ImageNet normalization as buffers (moves with .to(device))
+        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+        self.register_buffer("std",  torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+
+        self._moved = False  # ensure we move extractor once
+    
+    def _ensure_device(self, device: torch.device):
+        if not self._moved:
+            self.feature_extractor.to(device)
+            self._moved = True
     
     def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
@@ -52,24 +64,26 @@ class PerceptualLoss(nn.Module):
         Returns:
             loss: scalar perceptual loss
         """
-        loss = 0.0
+        self._ensure_device(pred.device)
         
-        # Normalize to ImageNet stats
-        mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(pred.device)
-        std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(pred.device)
-        
-        pred_norm = (pred - mean) / std
-        target_norm = (target - mean) / std
-        
-        # Extract features from each layer
-        for layer_id in self.layers:
-            pred_feat = self.feature_extractor[layer_id](pred_norm)
-            target_feat = self.feature_extractor[layer_id](target_norm)
-            
-            # L2 loss on features
-            loss += F.mse_loss(pred_feat, target_feat)
-        
-        return loss / len(self.layers)
+        # Perceptual loss: force fp32 for stability + avoid AMP dtype issues
+        with autocast(enabled=False):
+            pred = pred.float()
+            target = target.float()
+
+            mean = self.mean.to(pred.device, dtype=pred.dtype)
+            std = self.std.to(pred.device, dtype=pred.dtype)
+
+            pred_norm = (pred - mean) / std
+            target_norm = (target - mean) / std
+
+            loss = 0.0
+            for layer_id in self.layers:
+                pred_feat = self.feature_extractor[layer_id](pred_norm)
+                target_feat = self.feature_extractor[layer_id](target_norm)
+                loss = loss + F.mse_loss(pred_feat, target_feat)
+
+            return loss / len(self.layers)
 
 
 class WorldModelLoss(nn.Module):
