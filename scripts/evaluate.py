@@ -68,7 +68,8 @@ class ModelEvaluator:
         self,
         model: nn.Module,
         device: torch.device,
-        output_dir: Path
+        output_dir: Path,
+        debug: bool = False,
     ):
         """
         Args:
@@ -79,6 +80,8 @@ class ModelEvaluator:
         self.model = model
         self.device = device
         self.output_dir = output_dir
+        self.debug = debug
+        self._debug_printed = False
         
         # Create output directories
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -93,6 +96,12 @@ class ModelEvaluator:
         except:
             print("Warning: LPIPS not available")
             self.lpips_fn = None
+            
+    def _denorm_imagenet(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (B,T,C,H,W) or (B,C,H,W)
+        mean = torch.tensor([0.485, 0.456, 0.406], device=x.device).view(1, 1, 3, 1, 1)
+        std  = torch.tensor([0.229, 0.224, 0.225], device=x.device).view(1, 1, 3, 1, 1)
+        return x * std + mean
     
     @torch.no_grad()
     def evaluate_batch(
@@ -117,35 +126,72 @@ class ModelEvaluator:
         reconstructed = outputs['reconstructed']  # (B, T, C, H, W)
         predicted = outputs['predicted']  # (B, T-1, C, H, W)
         
+        # ===== PSNR/SSIM용: 모두 0~1로 통일 =====
+        images_01 = self._denorm_imagenet(images).clamp(0, 1)
+        recon_01 = ((reconstructed + 1.0) / 2.0).clamp(0, 1)
+        pred_01  = ((predicted + 1.0) / 2.0).clamp(0, 1)
+
+        # ===== LPIPS용: 모두 -1~1로 통일 =====
+        images_m11 = (images_01 * 2.0 - 1.0).clamp(-1, 1)
+        recon_m11  = reconstructed.clamp(-1, 1)
+        pred_m11   = predicted.clamp(-1, 1)
+        
+        
+        if getattr(self, "debug", False) and not getattr(self, "_debug_printed", False):
+            self._debug_printed = True
+            self._stats("images_raw", images)
+            self._stats("recon_raw", reconstructed)
+            self._stats("images_01", images_01)
+            self._stats("recon_01", recon_01)
+            self._stats("images_m11", images_m11)
+            self._stats("recon_m11", recon_m11)
+        
         # Calculate metrics
         metrics = {}
         
         # Reconstruction metrics (all frames)
-        recon_psnr = calculate_psnr(reconstructed, images)
-        recon_ssim = calculate_ssim(reconstructed, images)
+        recon_psnr = calculate_psnr(recon_01, images_01)
+        recon_ssim = calculate_ssim(recon_01, images_01)
         metrics['recon_psnr'] = recon_psnr.item()
         metrics['recon_ssim'] = recon_ssim.item()
         
         if self.lpips_fn:
             # LPIPS expects (B*T, C, H, W)
+            # B, T = images.shape[:2]
+            # recon_flat = reconstructed.reshape(B * T, *reconstructed.shape[2:])
+            # images_flat = images.reshape(B * T, *images.shape[2:])
+            # recon_lpips = self.lpips_fn(recon_flat, images_flat).mean()
+            
             B, T = images.shape[:2]
-            recon_flat = reconstructed.reshape(B * T, *reconstructed.shape[2:])
-            images_flat = images.reshape(B * T, *images.shape[2:])
+            recon_flat  = recon_m11.reshape(B * T, *recon_m11.shape[2:])
+            images_flat = images_m11.reshape(B * T, *images_m11.shape[2:])
             recon_lpips = self.lpips_fn(recon_flat, images_flat).mean()
             metrics['recon_lpips'] = recon_lpips.item()
         
         # Prediction metrics (future frames)
-        pred_psnr = calculate_psnr(predicted, images[:, 1:])
-        pred_ssim = calculate_ssim(predicted, images[:, 1:])
+        pred_psnr = calculate_psnr(pred_01, images_01[:, 1:])
+        pred_ssim = calculate_ssim(pred_01, images_01[:, 1:])
         metrics['pred_psnr'] = pred_psnr.item()
         metrics['pred_ssim'] = pred_ssim.item()
         
         if self.lpips_fn:
-            B, T = predicted.shape[:2]
-            pred_flat = predicted.reshape(B * T, *predicted.shape[2:])
-            target_flat = images[:, 1:].reshape(B * T, *images.shape[2:])
-            pred_lpips = self.lpips_fn(pred_flat, target_flat).mean()
+            # B, T = predicted.shape[:2]
+            # pred_flat = predicted.reshape(B * T, *predicted.shape[2:])
+            # target_flat = images[:, 1:].reshape(B * T, *images.shape[2:])
+            # pred_lpips = self.lpips_fn(pred_flat, target_flat).mean()
+            
+            B, Tm1 = pred_m11.shape[:2]  # T-1
+            pred_flat   = pred_m11.reshape(B * Tm1, *pred_m11.shape[2:])
+            target      = images_m11[:, 1:]  # (B, T-1, C, H, W)
+            target_flat = target.reshape(B * Tm1, *target.shape[2:])
+            pred_lpips  = self.lpips_fn(pred_flat, target_flat).mean()
+
             metrics['pred_lpips'] = pred_lpips.item()
+        
+        if self.lpips_fn and getattr(self, "debug", False):
+            gt_flat = images_m11.reshape(images_m11.shape[0] * images_m11.shape[1], *images_m11.shape[2:])
+            gt_lpips = self.lpips_fn(gt_flat, gt_flat).mean().item()
+            print(f"[DEBUG] LPIPS(GT,GT)={gt_lpips:.6f} (should be ~0)")
         
         # Temporal consistency
         if T > 1:
@@ -349,15 +395,17 @@ class ModelEvaluator:
         plt.close()
     
     def _tensor_to_image(self, tensor: torch.Tensor) -> np.ndarray:
-        """Convert tensor to displayable image."""
-        # Denormalize from [-1, 1] to [0, 1]
-        image = (tensor + 1) / 2
-        image = torch.clamp(image, 0, 1)
-        
-        # Convert to numpy
-        image = image.permute(1, 2, 0).numpy()
-        
-        return image
+        # tensor: (C,H,W)
+        x = tensor.detach().cpu()
+
+        # -1~1이면 0~1로
+        if x.min() < 0:
+            x = (x + 1) / 2
+
+        x = torch.clamp(x, 0, 1)
+        x = x.permute(1, 2, 0).numpy()
+        return x
+
     
     def benchmark_latency(
         self,
@@ -504,6 +552,23 @@ class ModelEvaluator:
             json.dump(results, f, indent=2)
         
         print(f"\n✓ Results saved to {self.output_dir / 'results.json'}")
+        
+    def _stats(self, name: str, x: torch.Tensor):
+        x = x.detach()
+        print(f"[{name}] dtype={x.dtype}, shape={tuple(x.shape)} "
+            f"min={x.min().item():.4f}, max={x.max().item():.4f}, mean={x.mean().item():.4f}")
+
+    def _to_01(self, x: torch.Tensor) -> torch.Tensor:
+        # x가 -1~1로 보이면 0~1로 바꿔주기
+        if x.min() < 0:
+            x = (x + 1.0) / 2.0
+        return x
+
+    def _to_m11(self, x: torch.Tensor) -> torch.Tensor:
+        # x가 0~1로 보이면 -1~1로 바꿔주기 (LPIPS용)
+        if x.min() >= 0 and x.max() <= 1.0:
+            x = x * 2.0 - 1.0
+        return x
 
 
 def main():
@@ -638,7 +703,7 @@ def main():
     print(f"✓ Model loaded (epoch {epoch})")
     
     # Create evaluator
-    evaluator = ModelEvaluator(model, device, output_dir)
+    evaluator = ModelEvaluator(model, device, output_dir, debug=True)
     
     # Evaluate on dataset
     metrics = {}

@@ -1,5 +1,34 @@
 {
-  "metrics": {},
+  "metrics": {
+    "recon_psnr_mean": 14.410788218180338,
+    "recon_psnr_std": 1.05291525163422,
+    "recon_psnr_min": 12.981355667114258,
+    "recon_psnr_max": 15.486735343933105,
+    "recon_ssim_mean": 0.33521386981010437,
+    "recon_ssim_std": 0.05842302573010818,
+    "recon_ssim_min": 0.2534140348434448,
+    "recon_ssim_max": 0.38618677854537964,
+    "recon_lpips_mean": 0.8296276926994324,
+    "recon_lpips_std": 0.018397080300866966,
+    "recon_lpips_min": 0.8058018088340759,
+    "recon_lpips_max": 0.8505918383598328,
+    "pred_psnr_mean": 15.141919136047363,
+    "pred_psnr_std": 1.8064404358284305,
+    "pred_psnr_min": 12.587386131286621,
+    "pred_psnr_max": 16.443912506103516,
+    "pred_ssim_mean": 0.33774058520793915,
+    "pred_ssim_std": 0.06836785568325601,
+    "pred_ssim_min": 0.2410983294248581,
+    "pred_ssim_max": 0.3886016607284546,
+    "pred_lpips_mean": 0.8238059480985006,
+    "pred_lpips_std": 0.05529018900774611,
+    "pred_lpips_min": 0.7833349108695984,
+    "pred_lpips_max": 0.901981770992279,
+    "temporal_consistency_mean": 0.05214502910772959,
+    "temporal_consistency_std": 0.02600914850882244,
+    "temporal_consistency_min": 0.030877962708473206,
+    "temporal_consistency_max": 0.08876889944076538
+  },
   "latency": null,
-  "timestamp": "2025-12-18 11:26:58"
+  "timestamp": "2025-12-20 10:08:10"
 }

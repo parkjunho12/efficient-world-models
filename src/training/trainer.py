@@ -59,7 +59,7 @@ class Trainer:
         self.val_interval = self.config.get('val_interval', 1000)
         
         # Checkpointing
-        self.checkpoint_dir = Path(self.config.get('checkpoint_dir', './checkpoints'))
+        self.checkpoint_dir = Path(self.config.get('checkpoint_dir', './checkpoints_01'))
         self.checkpoint_dir.mkdir(exist_ok=True, parents=True)
         
         # State

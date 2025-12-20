@@ -43,8 +43,9 @@ class PerceptualLoss(nn.Module):
         self.eval()
         
         # ImageNet normalization as buffers (moves with .to(device))
-        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
-        self.register_buffer("std",  torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+        self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1))
+        self.register_buffer("std",  torch.tensor([0.229, 0.224, 0.225]).reshape(1, 3, 1, 1))
+        
 
         self._moved = False  # ensure we move extractor once
     
@@ -109,31 +110,78 @@ class WorldModelLoss(nn.Module):
         self.latent_reg_weight = config.get('latent_reg_weight', 0.01)
         self.temporal_weight = config.get('temporal_weight', 0.1)
         
+        # self.register_buffer("mean", torch.tensor([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1))
+        # self.register_buffer("std",  torch.tensor([0.229, 0.224, 0.225]).reshape(1, 3, 1, 1))
+        self.register_buffer("mean_bt", torch.tensor([0.485, 0.456, 0.406]).view(1, 1, 3, 1, 1))
+        self.register_buffer("std_bt",  torch.tensor([0.229, 0.224, 0.225]).view(1, 1, 3, 1, 1))
+
+        
         # Perceptual loss
         if self.perceptual_weight > 0:
             self.perceptual_loss = PerceptualLoss()
+    
+    
+    def tanh_to_01(self, x: torch.Tensor) -> torch.Tensor:
+        """[-1,1] -> [0,1]"""
+        return ((x + 1.0) * 0.5).clamp(0.0, 1.0)
+
+    def unnormalize_to_01(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        ImageNet-normalized -> [0,1]
+        Supports (B,T,C,H,W) or (B,C,H,W)
+        """
+        if x.ndim == 5:
+            mean = self.mean_bt.to(x.device, dtype=x.dtype)
+            std = self.std_bt.to(x.device, dtype=x.dtype)
+            return (x * std + mean).clamp(0.0, 1.0)
+
+        if x.ndim == 4:
+            mean = self.mean_bt[:, 0].to(x.device, dtype=x.dtype)  # (1,3,1,1)
+            std = self.std_bt[:, 0].to(x.device, dtype=x.dtype)
+            return (x * std + mean).clamp(0.0, 1.0)
+
+        raise ValueError(f"Expected 4D or 5D tensor, got shape={tuple(x.shape)}")
+
+    def _flatten_bt(self, x: torch.Tensor) -> torch.Tensor:
+        """(B,T,C,H,W) -> (B*T,C,H,W)"""
+        if x.ndim == 5:
+            B, T, C, H, W = x.shape
+            return x.reshape(B * T, C, H, W)
+        return x
     
     def reconstruction_loss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """
         Combined pixel + perceptual reconstruction loss
         """
         # Pixel-wise L1 loss (more robust than L2)
-        pixel_loss = F.l1_loss(pred, target)
+        # pixel_loss = F.l1_loss(pred, target)
         
-        # Perceptual loss
-        if self.perceptual_weight > 0:
-            # Flatten batch and time dimensions
-            if pred.ndim == 5:
-                B, T, C, H, W = pred.shape
-                pred_flat = pred.view(B * T, C, H, W)
-                target_flat = target.view(B * T, C, H, W)
-            else:
-                pred_flat = pred
-                target_flat = target
+        
+        # # Perceptual loss
+        # if self.perceptual_weight > 0:
+        #     # Flatten batch and time dimensions
+        #     if pred.ndim == 5:
+        #         B, T, C, H, W = pred.shape
+        #         pred_flat = pred.reshape(B * T, C, H, W)
+        #         target_flat = target.reshape(B * T, C, H, W)
+        #     else:
+        #         pred_flat = pred
+        #         target_flat = target
             
-            perceptual = self.perceptual_loss(pred_flat, target_flat)
-            return pixel_loss + self.perceptual_weight * perceptual
+        #     perceptual = self.perceptual_loss(pred_flat, target_flat)
+            # return pixel_loss + self.perceptual_weight * perceptual
         
+        pred01 = self.tanh_to_01(pred)
+        tgt01  = self.unnormalize_to_01(target)
+
+        pixel_loss = F.l1_loss(pred01, tgt01)
+
+        if self.perceptual_loss is not None and self.perceptual_weight > 0:
+            pred_flat = self._flatten_bt(pred01)
+            tgt_flat  = self._flatten_bt(tgt01)
+            perceptual = self.perceptual_loss(pred_flat, tgt_flat)
+            return pixel_loss + self.perceptual_weight * perceptual
+
         return pixel_loss
     
     def prediction_loss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:

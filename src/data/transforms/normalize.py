@@ -39,8 +39,8 @@ class Normalize:
         if mean is None or std is None:
             mean, std = get_normalization_params(preset)
         
-        self.mean = torch.tensor(mean).view(-1, 1, 1)
-        self.std = torch.tensor(std).view(-1, 1, 1)
+        self.mean = torch.tensor(mean).reshape(-1, 1, 1)
+        self.std = torch.tensor(std).reshape(-1, 1, 1)
         self.preset = preset
     
     def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
@@ -116,8 +116,8 @@ class Denormalize:
         if mean is None or std is None:
             mean, std = get_normalization_params(preset)
         
-        self.mean = torch.tensor(mean).view(-1, 1, 1)
-        self.std = torch.tensor(std).view(-1, 1, 1)
+        self.mean = torch.tensor(mean).reshape(-1, 1, 1)
+        self.std = torch.tensor(std).reshape(-1, 1, 1)
     
     def __call__(self, tensor: torch.Tensor) -> torch.Tensor:
         """
@@ -344,7 +344,7 @@ def compute_dataset_statistics(
         if images.ndim == 5:
             # (B, T, C, H, W) -> flatten batch and time
             B, T = images.shape[:2]
-            images = images.view(B * T, *images.shape[2:])
+            images = images.reshape(B * T, *images.shape[2:])
         
         batch_samples = images.shape[0]
         

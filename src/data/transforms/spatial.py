@@ -107,8 +107,8 @@ class SpatialTransform:
         if not self.normalize:
             return tensor
         
-        mean = torch.tensor(self.mean).view(-1, 1, 1)
-        std = torch.tensor(self.std).view(-1, 1, 1)
+        mean = torch.tensor(self.mean).reshape(-1, 1, 1)
+        std = torch.tensor(self.std).reshape(-1, 1, 1)
         
         return tensor * std + mean
 

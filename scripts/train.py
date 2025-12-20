@@ -44,22 +44,27 @@ def main():
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.2f}M")
     
     # Data
-    transform = SpatialTransform(
+    train_transform = SpatialTransform(
         image_size=tuple(config['data']['image_size']),
         augment=True
+    )
+    
+    val_transform = SpatialTransform(
+        image_size=tuple(config['data']['image_size']),
+        augment=False
     )
     
     train_dataset = NuScenesDataset(
         data_root=args.data_root,
         sequence_length=config['data']['sequence_length'],
-        transform=transform,
+        transform=train_transform,
         split='train'
     )
     
     val_dataset = NuScenesDataset(
         data_root=args.data_root,
         sequence_length=config['data']['sequence_length'],
-        transform=transform,
+        transform=val_transform,
         split='val'
     )
     

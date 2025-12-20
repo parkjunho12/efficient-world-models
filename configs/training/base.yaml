@@ -14,7 +14,7 @@ training:
   batch_size: 8
   num_epochs: 100
   use_amp: False
-  grad_accum_steps: 1
+  grad_accum_steps: 2
   grad_clip: 1.0
   
   log_interval: 100
@@ -29,6 +29,6 @@ optimizer:
 
 loss:
   recon_weight: 1.0
-  pred_weight: 1.0
-  perceptual_weight: 0.1
-  latent_reg_weight: 0.01
+  pred_weight: 0.0
+  perceptual_weight: 0.2
+  latent_reg_weight: 0.0

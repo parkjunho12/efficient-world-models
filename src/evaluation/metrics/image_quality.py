@@ -43,8 +43,8 @@ def calculate_psnr(
     # Handle sequence dimension
     if pred.dim() == 5:
         B, T = pred.shape[:2]
-        pred = pred.view(B * T, *pred.shape[2:])
-        target = target.view(B * T, *target.shape[2:])
+        pred = pred.reshape(B * T, *pred.shape[2:])
+        target = target.reshape(B * T, *target.shape[2:])
     
     # Calculate MSE
     mse = F.mse_loss(pred, target, reduction='none')
@@ -82,8 +82,8 @@ def calculate_ssim(
     # Handle sequence dimension
     if pred.dim() == 5:
         B, T = pred.shape[:2]
-        pred = pred.view(B * T, *pred.shape[2:])
-        target = target.view(B * T, *target.shape[2:])
+        pred = pred.reshape(B * T, *pred.shape[2:])
+        target = target.reshape(B * T, *target.shape[2:])
     
     # Constants for numerical stability
     C1 = (0.01) ** 2
@@ -169,7 +169,7 @@ def calculate_ms_ssim(
     
     # Weighted combination
     mssim = torch.stack(mssim, dim=0)
-    ms_ssim = torch.prod(mssim ** weights.view(-1, 1), dim=0)
+    ms_ssim = torch.prod(mssim ** weights.reshape(-1, 1), dim=0)
     
     if reduce:
         return ms_ssim.mean()
@@ -207,8 +207,8 @@ def calculate_lpips(
     # Handle sequence dimension
     if pred.dim() == 5:
         B, T = pred.shape[:2]
-        pred = pred.view(B * T, *pred.shape[2:])
-        target = target.view(B * T, *target.shape[2:])
+        pred = pred.reshape(B * T, *pred.shape[2:])
+        target = target.reshape(B * T, *target.shape[2:])
     
     # Initialize LPIPS model (cache it if called multiple times)
     if not hasattr(calculate_lpips, '_lpips_model'):
